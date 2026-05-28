@@ -17,6 +17,7 @@ const PORT = process.env.PORT || 3000;
 const VIDEO_DEVICE = process.env.VIDEO_DEVICE || '/dev/video0';
 
 const DRAWING_PATH = path.join(TMP_DIR, 'drawing.png');
+const DRAWING_PROCESSED_PATH = path.join(TMP_DIR, 'drawing_processed.png');
 
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -113,9 +114,9 @@ app.post('/capture/drawing', (req, res) => {
     try {
       fs.writeFileSync(DRAWING_PATH, Buffer.concat(chunks));
       logger.debug('Drawing saved');
-      await preprocessFile(DRAWING_PATH, DRAWING_PATH);
+      await preprocessFile(DRAWING_PATH, DRAWING_PROCESSED_PATH);
       logger.debug('Drawing preprocessed');
-      const text = await recognize(DRAWING_PATH, 8);
+      const text = await recognize(DRAWING_PROCESSED_PATH, 8);
       logger.info(`OCR result: "${text}"`);
       const ascii = await render(text);
       res.json({ success: true, text, ascii });
