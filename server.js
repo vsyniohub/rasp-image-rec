@@ -8,6 +8,7 @@ const logger = require('./src/logger');
 const { grabFrame, preprocess, preprocessFile, PROCESSED_PATH, TMP_DIR } = require('./src/capture');
 const { recognize } = require('./src/ocr');
 const { render } = require('./src/ascii');
+const { toAscii } = require('./src/doodle');
 
 // Ensure runtime directories exist
 fs.mkdirSync(TMP_DIR, { recursive: true });
@@ -18,12 +19,14 @@ const VIDEO_DEVICE = process.env.VIDEO_DEVICE || '/dev/video0';
 
 const DRAWING_PATH = path.join(TMP_DIR, 'drawing.png');
 const DRAWING_PROCESSED_PATH = path.join(TMP_DIR, 'drawing_processed.png');
+const DOODLE_PATH = path.join(TMP_DIR, 'doodle.png');
 
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Page routes
 app.get('/camera', (req, res) => res.sendFile(path.join(__dirname, 'public', 'camera.html')));
 app.get('/draw', (req, res) => res.sendFile(path.join(__dirname, 'public', 'draw.html')));
+app.get('/doodle', (req, res) => res.sendFile(path.join(__dirname, 'public', 'doodle.html')));
 
 // HDMI live stream
 app.get('/stream', (req, res) => {
@@ -103,6 +106,29 @@ app.post('/capture', async (req, res) => {
     logger.error(`Capture failed: ${err.message}`);
     res.status(500).json({ success: false, error: err.message });
   }
+});
+
+// Doodle canvas: receive PNG blob → pixel-to-ASCII conversion
+app.post('/capture/doodle', (req, res) => {
+  logger.info('Doodle capture requested');
+  const chunks = [];
+  req.on('data', (chunk) => chunks.push(chunk));
+  req.on('error', (err) => {
+    logger.error(`Doodle request stream error: ${err.message}`);
+    res.status(500).json({ success: false, error: err.message });
+  });
+  req.on('end', async () => {
+    try {
+      fs.writeFileSync(DOODLE_PATH, Buffer.concat(chunks));
+      logger.debug('Doodle saved');
+      const ascii = await toAscii(DOODLE_PATH);
+      logger.panel('doodle', ascii);
+      res.json({ success: true, ascii });
+    } catch (err) {
+      logger.error(`Doodle conversion failed: ${err.message}`);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
 });
 
 // Drawing canvas: receive PNG blob → OCR + ASCII

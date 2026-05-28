@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Doodle — ASCII Art</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0d0d0d;
+      color: #e0e0e0;
+      font-family: 'Courier New', Courier, monospace;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 24px 16px;
+      gap: 24px;
+    }
+
+    nav { width: 100%; max-width: 500px; }
+    nav a { color: #555; text-decoration: none; font-size: 0.8rem; letter-spacing: 0.1em; }
+    nav a:hover { color: #aaa; }
+
+    h1 { font-size: 1.2rem; letter-spacing: 0.15em; color: #aaa; text-transform: uppercase; }
+    p.hint { font-size: 0.78rem; color: #555; letter-spacing: 0.05em; }
+
+    #canvas-wrap {
+      border: 1px solid #333;
+      border-radius: 4px;
+      background: #fff;
+      cursor: crosshair;
+      touch-action: none;
+    }
+
+    canvas { display: block; }
+
+    .btn {
+      padding: 14px 48px;
+      font-size: 1rem;
+      font-family: inherit;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      background: #1a1a1a;
+      color: #e0e0e0;
+      border: 1px solid #555;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    .btn:hover:not(:disabled) { background: #2a2a2a; border-color: #888; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    #btn-row { display: flex; gap: 12px; }
+
+    #clear-btn {
+      padding: 14px 24px;
+      font-size: 0.8rem;
+      border-color: #3a3a3a;
+      color: #888;
+    }
+
+    #status { font-size: 0.85rem; color: #666; min-height: 1.2em; letter-spacing: 0.05em; }
+    #error-msg { color: #ff6b6b; font-size: 0.85rem; }
+
+    #result { width: 100%; max-width: 900px; display: none; }
+    #result-label { font-size: 0.75rem; color: #555; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 8px; }
+
+    #ascii-art {
+      background: #111;
+      border: 1px solid #333;
+      border-radius: 4px;
+      padding: 24px;
+      font-size: clamp(0.4rem, 1.2vw, 0.75rem);
+      line-height: 1.1;
+      white-space: pre;
+      color: #c8ff80;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+
+  <nav><a href="/">← Back</a></nav>
+
+  <h1>Doodle to ASCII</h1>
+  <p class="hint">Draw anything — it gets converted to ASCII art.</p>
+
+  <div id="canvas-wrap">
+    <canvas id="canvas" width="420" height="420"></canvas>
+  </div>
+
+  <div id="btn-row">
+    <button id="capture-btn" class="btn">Convert</button>
+    <button id="clear-btn" class="btn">Clear</button>
+  </div>
+
+  <p id="status"></p>
+  <p id="error-msg"></p>
+
+  <div id="result">
+    <p id="result-label">ASCII output</p>
+    <pre id="ascii-art"></pre>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const captureBtn = document.getElementById('capture-btn');
+    const clearBtn = document.getElementById('clear-btn');
+    const status = document.getElementById('status');
+    const errorMsg = document.getElementById('error-msg');
+    const result = document.getElementById('result');
+    const asciiArt = document.getElementById('ascii-art');
+
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 8;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    let drawing = false;
+
+    function getPos(e) {
+      const rect = canvas.getBoundingClientRect();
+      const src = e.touches ? e.touches[0] : e;
+      return {
+        x: (src.clientX - rect.left) * (canvas.width / rect.width),
+        y: (src.clientY - rect.top) * (canvas.height / rect.height),
+      };
+    }
+
+    canvas.addEventListener('pointerdown', (e) => {
+      drawing = true;
+      const { x, y } = getPos(e);
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+    });
+
+    canvas.addEventListener('pointermove', (e) => {
+      if (!drawing) return;
+      const { x, y } = getPos(e);
+      ctx.lineTo(x, y);
+      ctx.stroke();
+    });
+
+    canvas.addEventListener('pointerup', () => drawing = false);
+    canvas.addEventListener('pointerleave', () => drawing = false);
+
+    clearBtn.addEventListener('click', () => {
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      result.style.display = 'none';
+      status.textContent = '';
+      errorMsg.textContent = '';
+    });
+
+    captureBtn.addEventListener('click', () => {
+      captureBtn.disabled = true;
+      status.textContent = 'Converting...';
+      errorMsg.textContent = '';
+      result.style.display = 'none';
+
+      canvas.toBlob(async (blob) => {
+        try {
+          const res = await fetch('/capture/doodle', {
+            method: 'POST',
+            body: blob,
+            headers: { 'Content-Type': 'image/png' },
+          });
+          const data = await res.json();
+          if (data.success) {
+            asciiArt.textContent = data.ascii;
+            result.style.display = 'block';
+            status.textContent = 'Done.';
+          } else {
+            errorMsg.textContent = data.error || 'Conversion failed.';
+            status.textContent = '';
+          }
+        } catch (e) {
+          errorMsg.textContent = 'Server error: ' + e.message;
+          status.textContent = '';
+        } finally {
+          captureBtn.disabled = false;
+        }
+      }, 'image/png');
+    });
+  </script>
+
+</body>
+</html>
