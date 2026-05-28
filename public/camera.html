@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Camera — Letter Recognition</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0d0d0d;
+      color: #e0e0e0;
+      font-family: 'Courier New', Courier, monospace;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 24px 16px;
+      gap: 24px;
+    }
+
+    nav {
+      width: 100%;
+      max-width: 800px;
+    }
+
+    nav a {
+      color: #555;
+      text-decoration: none;
+      font-size: 0.8rem;
+      letter-spacing: 0.1em;
+    }
+
+    nav a:hover { color: #aaa; }
+
+    h1 {
+      font-size: 1.2rem;
+      letter-spacing: 0.15em;
+      color: #aaa;
+      text-transform: uppercase;
+    }
+
+    #live-view {
+      width: 100%;
+      max-width: 800px;
+      border: 1px solid #333;
+      border-radius: 4px;
+      background: #111;
+    }
+
+    #live-view img, #live-view video {
+      width: 100%;
+      display: block;
+      border-radius: 4px;
+    }
+
+    .btn {
+      padding: 14px 48px;
+      font-size: 1rem;
+      font-family: inherit;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      background: #1a1a1a;
+      color: #e0e0e0;
+      border: 1px solid #555;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    .btn:hover:not(:disabled) { background: #2a2a2a; border-color: #888; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    #btn-row { display: flex; gap: 12px; align-items: center; }
+
+    #source-toggle {
+      padding: 10px 16px;
+      font-size: 0.75rem;
+      border-color: #3a3a3a;
+      color: #666;
+    }
+
+    #test-btn {
+      padding: 14px 24px;
+      font-size: 0.8rem;
+      border-color: #3a3a3a;
+      color: #888;
+    }
+
+    #preview-img {
+      display: none;
+      width: 100%;
+      max-width: 800px;
+      border: 1px solid #333;
+      border-radius: 4px;
+    }
+
+    #status { font-size: 0.85rem; color: #666; min-height: 1.2em; letter-spacing: 0.05em; }
+    #error-msg { color: #ff6b6b; font-size: 0.85rem; }
+
+    #result { width: 100%; max-width: 900px; display: none; }
+    #result-label { font-size: 0.75rem; color: #555; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 8px; }
+
+    #ascii-art {
+      background: #111;
+      border: 1px solid #333;
+      border-radius: 4px;
+      padding: 24px;
+      font-size: clamp(0.5rem, 1.5vw, 1rem);
+      line-height: 1.2;
+      white-space: pre;
+      color: #c8ff80;
+      overflow-x: auto;
+    }
+
+    #recognized-char { margin-top: 12px; font-size: 0.85rem; color: #888; }
+  </style>
+</head>
+<body>
+
+  <nav><a href="/">← Back</a></nav>
+
+  <h1>Camera</h1>
+
+  <div id="live-view">
+    <img id="stream-img" src="/stream" alt="HDMI live view" />
+    <video id="phone-video" autoplay playsinline style="display:none"></video>
+  </div>
+
+  <div id="btn-row">
+    <button id="capture-btn" class="btn">Capture</button>
+    <button id="test-btn" class="btn">Test shot</button>
+    <button id="source-toggle" class="btn">Switch to phone</button>
+  </div>
+
+  <img id="preview-img" alt="Preprocessed capture preview" />
+
+  <p id="status"></p>
+  <p id="error-msg"></p>
+
+  <div id="result">
+    <p id="result-label">Recognized output</p>
+    <pre id="ascii-art"></pre>
+    <p id="recognized-char"></p>
+  </div>
+
+  <script>
+    const captureBtn = document.getElementById('capture-btn');
+    const testBtn = document.getElementById('test-btn');
+    const sourceToggle = document.getElementById('source-toggle');
+    const streamImg = document.getElementById('stream-img');
+    const phoneVideo = document.getElementById('phone-video');
+    const previewImg = document.getElementById('preview-img');
+    const status = document.getElementById('status');
+    const errorMsg = document.getElementById('error-msg');
+    const result = document.getElementById('result');
+    const asciiArt = document.getElementById('ascii-art');
+    const recognizedChar = document.getElementById('recognized-char');
+
+    let usingPhone = false;
+
+    sourceToggle.addEventListener('click', async () => {
+      if (!usingPhone) {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+          phoneVideo.srcObject = stream;
+          streamImg.style.display = 'none';
+          phoneVideo.style.display = 'block';
+          sourceToggle.textContent = 'Switch to HDMI';
+          usingPhone = true;
+        } catch (e) {
+          errorMsg.textContent = 'Camera access denied: ' + e.message;
+        }
+      } else {
+        if (phoneVideo.srcObject) phoneVideo.srcObject.getTracks().forEach(t => t.stop());
+        phoneVideo.style.display = 'none';
+        streamImg.style.display = 'block';
+        sourceToggle.textContent = 'Switch to phone';
+        usingPhone = false;
+      }
+    });
+
+    function phoneSnapshot() {
+      const canvas = document.createElement('canvas');
+      canvas.width = phoneVideo.videoWidth;
+      canvas.height = phoneVideo.videoHeight;
+      canvas.getContext('2d').drawImage(phoneVideo, 0, 0);
+      return new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.9));
+    }
+
+    testBtn.addEventListener('click', async () => {
+      testBtn.disabled = true;
+      status.textContent = 'Capturing test shot...';
+      errorMsg.textContent = '';
+      previewImg.style.display = 'none';
+
+      try {
+        let res;
+        if (usingPhone) {
+          const blob = await phoneSnapshot();
+          res = await fetch('/capture/raw', { method: 'POST', body: blob, headers: { 'Content-Type': 'image/jpeg' } });
+        } else {
+          res = await fetch('/capture/raw', { method: 'POST' });
+        }
+        if (!res.ok) throw new Error(await res.text());
+        const blob = await res.blob();
+        previewImg.src = URL.createObjectURL(blob);
+        previewImg.style.display = 'block';
+        status.textContent = 'Test shot done — check preprocessing quality.';
+      } catch (e) {
+        errorMsg.textContent = 'Test shot error: ' + e.message;
+        status.textContent = '';
+      } finally {
+        testBtn.disabled = false;
+      }
+    });
+
+    captureBtn.addEventListener('click', async () => {
+      captureBtn.disabled = true;
+      status.textContent = 'Capturing...';
+      errorMsg.textContent = '';
+      result.style.display = 'none';
+
+      try {
+        let res;
+        if (usingPhone) {
+          const blob = await phoneSnapshot();
+          res = await fetch('/capture', { method: 'POST', body: blob, headers: { 'Content-Type': 'image/jpeg' } });
+        } else {
+          res = await fetch('/capture', { method: 'POST' });
+        }
+        const data = await res.json();
+        if (data.success) {
+          asciiArt.textContent = data.ascii;
+          recognizedChar.textContent = `Detected: "${data.text}"`;
+          result.style.display = 'block';
+          status.textContent = 'Done.';
+        } else {
+          errorMsg.textContent = data.error || 'Recognition failed.';
+          status.textContent = '';
+        }
+      } catch (e) {
+        errorMsg.textContent = 'Server error: ' + e.message;
+        status.textContent = '';
+      } finally {
+        captureBtn.disabled = false;
+      }
+    });
+  </script>
+
+</body>
+</html>

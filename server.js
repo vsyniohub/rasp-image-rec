@@ -3,7 +3,8 @@
 const express = require('express');
 const { spawn } = require('child_process');
 const path = require('path');
-const { grabFrame, preprocess, PROCESSED_PATH } = require('./src/capture');
+const fs = require('fs');
+const { grabFrame, preprocess, PROCESSED_PATH, TMP_DIR } = require('./src/capture');
 const { recognize } = require('./src/ocr');
 const { render } = require('./src/ascii');
 
@@ -11,8 +12,15 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const VIDEO_DEVICE = process.env.VIDEO_DEVICE || '/dev/video0';
 
+const DRAWING_PATH = path.join(TMP_DIR, 'drawing.png');
+
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Page routes
+app.get('/camera', (req, res) => res.sendFile(path.join(__dirname, 'public', 'camera.html')));
+app.get('/draw', (req, res) => res.sendFile(path.join(__dirname, 'public', 'draw.html')));
+
+// HDMI live stream
 app.get('/stream', (req, res) => {
   res.writeHead(200, {
     'Content-Type': 'multipart/x-mixed-replace; boundary=frame',
@@ -56,7 +64,7 @@ app.get('/stream', (req, res) => {
   ffmpeg.on('exit', () => res.end());
 });
 
-// Grab + preprocess only — no OCR, for tuning image quality
+// Camera: grab + preprocess only (tuning)
 app.post('/capture/raw', async (req, res) => {
   try {
     await grabFrame(VIDEO_DEVICE);
@@ -68,7 +76,7 @@ app.post('/capture/raw', async (req, res) => {
   }
 });
 
-// Grab + preprocess + OCR + ASCII art
+// Camera: grab + preprocess + OCR + ASCII
 app.post('/capture', async (req, res) => {
   try {
     await grabFrame(VIDEO_DEVICE);
@@ -80,6 +88,23 @@ app.post('/capture', async (req, res) => {
     console.error('Capture error:', err.message);
     res.status(500).json({ success: false, error: err.message });
   }
+});
+
+// Drawing canvas: receive PNG blob → OCR + ASCII
+app.post('/capture/drawing', (req, res) => {
+  const chunks = [];
+  req.on('data', (chunk) => chunks.push(chunk));
+  req.on('end', async () => {
+    try {
+      fs.writeFileSync(DRAWING_PATH, Buffer.concat(chunks));
+      const text = await recognize(DRAWING_PATH);
+      const ascii = await render(text);
+      res.json({ success: true, text, ascii });
+    } catch (err) {
+      console.error('Drawing capture error:', err.message);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
 });
 
 app.listen(PORT, '0.0.0.0', () => {
