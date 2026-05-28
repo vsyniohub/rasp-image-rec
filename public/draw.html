@@ -94,6 +94,7 @@
 
   <div id="btn-row">
     <button id="capture-btn" class="btn">Recognize</button>
+    <button id="save-btn" class="btn" disabled>Save</button>
     <button id="clear-btn" class="btn">Clear</button>
   </div>
 
@@ -109,13 +110,17 @@
   <script>
     const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d');
-    const captureBtn = document.getElementById('capture-btn');
-    const clearBtn = document.getElementById('clear-btn');
-    const status = document.getElementById('status');
-    const errorMsg = document.getElementById('error-msg');
-    const result = document.getElementById('result');
-    const asciiArt = document.getElementById('ascii-art');
+    const captureBtn     = document.getElementById('capture-btn');
+    const saveBtn        = document.getElementById('save-btn');
+    const clearBtn       = document.getElementById('clear-btn');
+    const status         = document.getElementById('status');
+    const errorMsg       = document.getElementById('error-msg');
+    const result         = document.getElementById('result');
+    const asciiArt       = document.getElementById('ascii-art');
     const recognizedChar = document.getElementById('recognized-char');
+
+    let lastAscii = null;
+    let lastText  = null;
 
     // White background
     ctx.fillStyle = '#ffffff';
@@ -159,6 +164,27 @@
       result.style.display = 'none';
       status.textContent = '';
       errorMsg.textContent = '';
+      saveBtn.disabled = true;
+      lastAscii = null;
+      lastText  = null;
+    });
+
+    saveBtn.addEventListener('click', async () => {
+      if (!lastAscii) return;
+      saveBtn.disabled = true;
+      try {
+        const res = await fetch('/gallery/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ascii: lastAscii, label: lastText || 'letter' }),
+        });
+        const data = await res.json();
+        status.textContent = data.success ? 'Saved to gallery.' : 'Save failed.';
+      } catch (e) {
+        status.textContent = 'Save error: ' + e.message;
+      } finally {
+        saveBtn.disabled = false;
+      }
     });
 
     captureBtn.addEventListener('click', () => {
@@ -178,6 +204,9 @@
           if (data.success) {
             asciiArt.textContent = data.ascii;
             recognizedChar.textContent = `Detected: "${data.text}"`;
+            lastAscii = data.ascii;
+            lastText  = data.text;
+            saveBtn.disabled = false;
             result.style.display = 'block';
             status.textContent = 'Done.';
           } else {

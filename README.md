@@ -27,6 +27,9 @@ Open `http://<raspberry-pi-ip>:3000` in a browser.
 ### Letter recognition (`/draw`, `/camera`)
 Draw or photograph a letter. The app preprocesses the image with `sharp`, runs Tesseract OCR, and renders the detected character as large ASCII art using `figlet`. The result is shown both in the browser and as a panel in the terminal.
 
+### Gallery
+Both `/draw` and `/doodle` have a **Save** button (enabled after a result is shown). Pressing it appends the ASCII art to `gallery/ascii.txt` with a timestamp and label. The file is excluded from git and the directory is auto-created on startup.
+
 ### Doodle to ASCII (`/doodle`)
 Draw anything freely. The drawing is converted to ASCII art by sampling pixel brightness across an 80×40 grid and mapping each pixel to a character from a dark-to-light ramp (`@#S%?*+;:,. `). No OCR involved — works for any shape or picture.
 

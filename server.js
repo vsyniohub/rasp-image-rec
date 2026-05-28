@@ -10,8 +10,12 @@ const { recognize } = require('./src/ocr');
 const { render } = require('./src/ascii');
 const { toAscii } = require('./src/doodle');
 
+const GALLERY_DIR  = path.join(__dirname, 'gallery');
+const GALLERY_FILE = path.join(GALLERY_DIR, 'ascii.txt');
+
 // Ensure runtime directories exist
-fs.mkdirSync(TMP_DIR, { recursive: true });
+fs.mkdirSync(TMP_DIR,     { recursive: true });
+fs.mkdirSync(GALLERY_DIR, { recursive: true });
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -151,6 +155,21 @@ app.post('/capture/drawing', (req, res) => {
       res.status(500).json({ success: false, error: err.message });
     }
   });
+});
+
+// Gallery: append ASCII entry to gallery/ascii.txt
+app.post('/gallery/save', express.json(), (req, res) => {
+  const { ascii, label } = req.body || {};
+  if (!ascii) return res.status(400).json({ success: false, error: 'No ascii provided' });
+  const header = `\n${'='.repeat(60)}\n[${new Date().toISOString()}] ${label || 'untitled'}\n${'='.repeat(60)}\n`;
+  try {
+    fs.appendFileSync(GALLERY_FILE, header + ascii + '\n');
+    logger.info(`Gallery saved: ${label || 'untitled'}`);
+    res.json({ success: true });
+  } catch (err) {
+    logger.error(`Gallery save failed: ${err.message}`);
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 app.listen(PORT, '0.0.0.0', () => {
