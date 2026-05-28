@@ -5,7 +5,7 @@ const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const logger = require('./src/logger');
-const { grabFrame, preprocess, PROCESSED_PATH, TMP_DIR } = require('./src/capture');
+const { grabFrame, preprocess, preprocessFile, PROCESSED_PATH, TMP_DIR } = require('./src/capture');
 const { recognize } = require('./src/ocr');
 const { render } = require('./src/ascii');
 
@@ -113,7 +113,9 @@ app.post('/capture/drawing', (req, res) => {
     try {
       fs.writeFileSync(DRAWING_PATH, Buffer.concat(chunks));
       logger.debug('Drawing saved');
-      const text = await recognize(DRAWING_PATH);
+      await preprocessFile(DRAWING_PATH, DRAWING_PATH);
+      logger.debug('Drawing preprocessed');
+      const text = await recognize(DRAWING_PATH, 8);
       logger.info(`OCR result: "${text}"`);
       const ascii = await render(text);
       res.json({ success: true, text, ascii });

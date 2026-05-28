@@ -36,4 +36,16 @@ async function preprocess() {
   return PROCESSED_PATH;
 }
 
-module.exports = { grabFrame, preprocess, CAPTURE_PATH, PROCESSED_PATH, TMP_DIR };
+async function preprocessFile(inputPath, outputPath) {
+  logger.debug(`Preprocessing file: ${inputPath}`);
+  await sharp(inputPath)
+    .grayscale()
+    .normalize()
+    .sharpen()
+    .threshold(128)
+    .png()
+    .toFile(outputPath);
+  return outputPath;
+}
+
+module.exports = { grabFrame, preprocess, preprocessFile, CAPTURE_PATH, PROCESSED_PATH, TMP_DIR };

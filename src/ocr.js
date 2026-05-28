@@ -10,12 +10,12 @@ const execFileAsync = promisify(execFile);
 
 const OCR_BASE = path.join(__dirname, '..', 'tmp', 'ocr_out');
 
-async function recognize(imagePath) {
-  logger.debug(`Running Tesseract on: ${imagePath}`);
+async function recognize(imagePath, psm = 8) {
+  logger.debug(`Running Tesseract on: ${imagePath} (psm ${psm})`);
   await execFileAsync('tesseract', [
     imagePath,
     OCR_BASE,
-    '--psm', '10',
+    '--psm', String(psm),
     '--oem', '3',
     '-c', 'tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789',
   ]);
