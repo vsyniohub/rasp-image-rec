@@ -14,37 +14,41 @@ const PROCESSED_PATH = path.join(TMP_DIR, 'processed.png');
 
 async function grabFrame(videoDevice) {
   logger.debug(`Grabbing frame from ${videoDevice}`);
-  await execFileAsync('ffmpeg', [
-    '-f', 'v4l2',
-    '-input_format', 'mjpeg',
-    '-frames:v', '1',
-    '-i', videoDevice,
-    '-y', CAPTURE_PATH,
-  ]);
+  try {
+    await execFileAsync('ffmpeg', [
+      '-f', 'v4l2',
+      '-input_format', 'mjpeg',
+      '-frames:v', '1',
+      '-i', videoDevice,
+      '-y', CAPTURE_PATH,
+    ]);
+    logger.debug('Frame grabbed successfully');
+  } catch (err) {
+    logger.error(`Failed to grab frame from ${videoDevice}: ${err.message}`);
+    throw err;
+  }
   return CAPTURE_PATH;
 }
 
 async function preprocess() {
-  logger.debug('Preprocessing image with sharp');
-  await sharp(CAPTURE_PATH)
-    .grayscale()
-    .normalize()
-    .sharpen()
-    .threshold(128)
-    .png()
-    .toFile(PROCESSED_PATH);
-  return PROCESSED_PATH;
+  return preprocessFile(CAPTURE_PATH, PROCESSED_PATH);
 }
 
 async function preprocessFile(inputPath, outputPath) {
   logger.debug(`Preprocessing file: ${inputPath}`);
-  await sharp(inputPath)
-    .grayscale()
-    .normalize()
-    .sharpen()
-    .threshold(128)
-    .png()
-    .toFile(outputPath);
+  try {
+    await sharp(inputPath)
+      .grayscale()
+      .normalize()
+      .sharpen()
+      .threshold(128)
+      .png()
+      .toFile(outputPath);
+    logger.debug(`Preprocessing done: ${outputPath}`);
+  } catch (err) {
+    logger.error(`Preprocessing failed for ${inputPath}: ${err.message}`);
+    throw err;
+  }
   return outputPath;
 }
 

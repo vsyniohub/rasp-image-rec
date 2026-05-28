@@ -1,0 +1,6 @@
+{
+  "logging": {
+    "consoleLevel": "result",
+    "fileLevel": "debug"
+  }
+}
