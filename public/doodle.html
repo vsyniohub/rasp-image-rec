@@ -94,7 +94,8 @@
 
   <div id="btn-row">
     <button id="capture-btn" class="btn">Convert</button>
-    <button id="save-btn" class="btn" disabled>Save</button>
+    <button id="save-btn" class="btn" disabled>Save ASCII</button>
+    <button id="save-img-btn" class="btn" disabled>Save Image</button>
     <button id="clear-btn" class="btn">Clear</button>
   </div>
 
@@ -111,6 +112,7 @@
     const ctx = canvas.getContext('2d');
     const captureBtn = document.getElementById('capture-btn');
     const saveBtn    = document.getElementById('save-btn');
+    const saveImgBtn = document.getElementById('save-img-btn');
     const clearBtn   = document.getElementById('clear-btn');
     const status     = document.getElementById('status');
     const errorMsg   = document.getElementById('error-msg');
@@ -118,6 +120,7 @@
     const asciiArt   = document.getElementById('ascii-art');
 
     let lastAscii = null;
+    let lastBlob  = null;
 
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -161,7 +164,27 @@
       status.textContent = '';
       errorMsg.textContent = '';
       saveBtn.disabled = true;
+      saveImgBtn.disabled = true;
       lastAscii = null;
+      lastBlob  = null;
+    });
+
+    saveImgBtn.addEventListener('click', async () => {
+      if (!lastBlob) return;
+      saveImgBtn.disabled = true;
+      try {
+        const res = await fetch('/gallery/image', {
+          method: 'POST',
+          body: lastBlob,
+          headers: { 'Content-Type': 'image/png' },
+        });
+        const data = await res.json();
+        status.textContent = data.success ? `Image saved: ${data.filename}` : 'Image save failed.';
+      } catch (e) {
+        status.textContent = 'Save error: ' + e.message;
+      } finally {
+        saveImgBtn.disabled = false;
+      }
     });
 
     saveBtn.addEventListener('click', async () => {
@@ -189,6 +212,7 @@
       result.style.display = 'none';
 
       canvas.toBlob(async (blob) => {
+        lastBlob = blob;
         try {
           const res = await fetch('/capture/doodle', {
             method: 'POST',
@@ -200,6 +224,7 @@
             asciiArt.textContent = data.ascii;
             lastAscii = data.ascii;
             saveBtn.disabled = false;
+            saveImgBtn.disabled = false;
             result.style.display = 'block';
             status.textContent = 'Done.';
           } else {
