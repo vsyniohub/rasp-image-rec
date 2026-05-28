@@ -96,8 +96,8 @@ app.post('/capture', async (req, res) => {
     await preprocess();
     logger.debug('Preprocessing done');
     const text = await recognize(PROCESSED_PATH);
-    logger.info(`OCR result: "${text}"`);
-    const ascii = await render(text);
+    const ascii = await render(text.toUpperCase());
+    logger.panel(text, ascii);
     res.json({ success: true, text, ascii });
   } catch (err) {
     logger.error(`Capture failed: ${err.message}`);
@@ -117,8 +117,8 @@ app.post('/capture/drawing', (req, res) => {
       await preprocessFile(DRAWING_PATH, DRAWING_PROCESSED_PATH);
       logger.debug('Drawing preprocessed');
       const text = await recognize(DRAWING_PROCESSED_PATH, 8);
-      logger.info(`OCR result: "${text}"`);
-      const ascii = await render(text);
+      const ascii = await render(text.toUpperCase());
+      logger.panel(text, ascii);
       res.json({ success: true, text, ascii });
     } catch (err) {
       logger.error(`Drawing capture failed: ${err.message}`);
