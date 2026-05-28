@@ -4,12 +4,14 @@ const { execFile } = require('child_process');
 const { promisify } = require('util');
 const fs = require('fs');
 const path = require('path');
+const logger = require('./logger');
 
 const execFileAsync = promisify(execFile);
 
 const OCR_BASE = path.join(__dirname, '..', 'tmp', 'ocr_out');
 
 async function recognize(imagePath) {
+  logger.debug(`Running Tesseract on: ${imagePath}`);
   await execFileAsync('tesseract', [
     imagePath,
     OCR_BASE,

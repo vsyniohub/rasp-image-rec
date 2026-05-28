@@ -4,9 +4,13 @@ const express = require('express');
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
+const logger = require('./src/logger');
 const { grabFrame, preprocess, PROCESSED_PATH, TMP_DIR } = require('./src/capture');
 const { recognize } = require('./src/ocr');
 const { render } = require('./src/ascii');
+
+// Ensure runtime directories exist
+fs.mkdirSync(TMP_DIR, { recursive: true });
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -22,6 +26,7 @@ app.get('/draw', (req, res) => res.sendFile(path.join(__dirname, 'public', 'draw
 
 // HDMI live stream
 app.get('/stream', (req, res) => {
+  logger.info('Stream started');
   res.writeHead(200, {
     'Content-Type': 'multipart/x-mixed-replace; boundary=frame',
     'Cache-Control': 'no-cache',
@@ -60,55 +65,67 @@ app.get('/stream', (req, res) => {
     if (start > 0) buffer = buffer.slice(start);
   });
 
-  req.on('close', () => ffmpeg.kill('SIGTERM'));
+  req.on('close', () => {
+    logger.info('Stream closed');
+    ffmpeg.kill('SIGTERM');
+  });
   ffmpeg.on('exit', () => res.end());
 });
 
 // Camera: grab + preprocess only (tuning)
 app.post('/capture/raw', async (req, res) => {
+  logger.info('Raw capture requested');
   try {
     await grabFrame(VIDEO_DEVICE);
     await preprocess();
+    logger.info('Raw capture complete');
     res.sendFile(PROCESSED_PATH);
   } catch (err) {
-    console.error('Raw capture error:', err.message);
+    logger.error(`Raw capture failed: ${err.message}`);
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
 // Camera: grab + preprocess + OCR + ASCII
 app.post('/capture', async (req, res) => {
+  logger.info('Capture requested');
   try {
     await grabFrame(VIDEO_DEVICE);
+    logger.debug('Frame grabbed');
     await preprocess();
+    logger.debug('Preprocessing done');
     const text = await recognize(PROCESSED_PATH);
+    logger.info(`OCR result: "${text}"`);
     const ascii = await render(text);
     res.json({ success: true, text, ascii });
   } catch (err) {
-    console.error('Capture error:', err.message);
+    logger.error(`Capture failed: ${err.message}`);
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
 // Drawing canvas: receive PNG blob → OCR + ASCII
 app.post('/capture/drawing', (req, res) => {
+  logger.info('Drawing capture requested');
   const chunks = [];
   req.on('data', (chunk) => chunks.push(chunk));
   req.on('end', async () => {
     try {
       fs.writeFileSync(DRAWING_PATH, Buffer.concat(chunks));
+      logger.debug('Drawing saved');
       const text = await recognize(DRAWING_PATH);
+      logger.info(`OCR result: "${text}"`);
       const ascii = await render(text);
       res.json({ success: true, text, ascii });
     } catch (err) {
-      console.error('Drawing capture error:', err.message);
+      logger.error(`Drawing capture failed: ${err.message}`);
       res.status(500).json({ success: false, error: err.message });
     }
   });
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Running on http://0.0.0.0:${PORT}`);
-  console.log(`Video device: ${VIDEO_DEVICE}`);
-  console.log(`Open in browser: http://<raspberry-pi-ip>:${PORT}`);
+  logger.info(`Server started on port ${PORT}`);
+  logger.info(`Video device: ${VIDEO_DEVICE}`);
+  logger.info(`Open in browser: http://<raspberry-pi-ip>:${PORT}`);
 });
