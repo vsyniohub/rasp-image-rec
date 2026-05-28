@@ -41,7 +41,7 @@ function write(levelName, message) {
     }
   }
 
-  if (levelVal >= cfg.consoleLevel) {
+  if (levelVal >= cfg.consoleLevel || levelName === 'error') {
     process.stdout.write(line);
   }
 }
