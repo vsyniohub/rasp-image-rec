@@ -9,7 +9,7 @@ const CONFIG_FILE = path.join(__dirname, '..', 'config.json');
 
 fs.mkdirSync(LOG_DIR, { recursive: true });
 
-const LEVELS = { debug: 0, info: 1, result: 2, error: 3 };
+const LEVELS = { debug: 0, info: 1, result: 2, error: 3, none: 4 };
 
 function loadConfig() {
   try {
@@ -46,11 +46,26 @@ function write(levelName, message) {
   }
 }
 
+function panel(label, ascii) {
+  const lines = ascii.split('\n');
+  const inner = [`  Recognized: "${label}"`, '', ...lines, ''];
+  const width = Math.max(...inner.map((l) => l.length)) + 2;
+  const top    = '╔' + '═'.repeat(width) + '╗';
+  const bottom = '╚' + '═'.repeat(width) + '╝';
+  const body   = inner.map((l) => '║ ' + l.padEnd(width - 1) + '║').join('\n');
+  const box    = `\n${top}\n${body}\n${bottom}\n`;
+
+  // always show panel on console and write to file regardless of levels
+  process.stdout.write(box);
+  try { fs.appendFileSync(LOG_FILE, box); } catch { /* skip */ }
+}
+
 const logger = {
   debug:  (msg) => write('debug', msg),
   info:   (msg) => write('info', msg),
   result: (msg) => write('result', msg),
   error:  (msg) => write('error', msg),
+  panel,
 };
 
 module.exports = logger;
