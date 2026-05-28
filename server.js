@@ -157,28 +157,6 @@ app.post('/capture/drawing', (req, res) => {
   });
 });
 
-// Gallery: save raw PNG image with timestamp
-app.post('/gallery/image', (req, res) => {
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const filename  = path.join(GALLERY_DIR, `doodle-${timestamp}.png`);
-  const chunks = [];
-  req.on('data', (chunk) => chunks.push(chunk));
-  req.on('error', (err) => {
-    logger.error(`Gallery image stream error: ${err.message}`);
-    res.status(500).json({ success: false, error: err.message });
-  });
-  req.on('end', () => {
-    try {
-      fs.writeFileSync(filename, Buffer.concat(chunks));
-      logger.info(`Gallery image saved: ${path.basename(filename)}`);
-      res.json({ success: true, filename: path.basename(filename) });
-    } catch (err) {
-      logger.error(`Gallery image save failed: ${err.message}`);
-      res.status(500).json({ success: false, error: err.message });
-    }
-  });
-});
-
 // Gallery: append ASCII entry to gallery/ascii.txt
 app.post('/gallery/save', express.json(), (req, res) => {
   const { ascii, label } = req.body || {};
