@@ -45,6 +45,11 @@ app.get('/stream', (req, res) => {
     'pipe:1',
   ], { stdio: ['ignore', 'pipe', 'ignore'] });
 
+  ffmpeg.on('error', (err) => {
+    logger.error(`ffmpeg stream error: ${err.message}`);
+    res.end();
+  });
+
   let buffer = Buffer.alloc(0);
   const SOI = Buffer.from([0xff, 0xd8]);
   const EOI = Buffer.from([0xff, 0xd9]);
@@ -92,11 +97,9 @@ app.post('/capture', async (req, res) => {
   logger.info('Capture requested');
   try {
     await grabFrame(VIDEO_DEVICE);
-    logger.debug('Frame grabbed');
     await preprocess();
-    logger.debug('Preprocessing done');
     const text = await recognize(PROCESSED_PATH);
-    logger.info(`OCR result: "${text}"`);
+    logger.result(`Recognized: "${text}"`);
     const ascii = await render(text);
     res.json({ success: true, text, ascii });
   } catch (err) {
@@ -110,14 +113,17 @@ app.post('/capture/drawing', (req, res) => {
   logger.info('Drawing capture requested');
   const chunks = [];
   req.on('data', (chunk) => chunks.push(chunk));
+  req.on('error', (err) => {
+    logger.error(`Drawing request stream error: ${err.message}`);
+    res.status(500).json({ success: false, error: err.message });
+  });
   req.on('end', async () => {
     try {
       fs.writeFileSync(DRAWING_PATH, Buffer.concat(chunks));
       logger.debug('Drawing saved');
       await preprocessFile(DRAWING_PATH, DRAWING_PROCESSED_PATH);
-      logger.debug('Drawing preprocessed');
       const text = await recognize(DRAWING_PROCESSED_PATH, 8);
-      logger.info(`OCR result: "${text}"`);
+      logger.result(`Recognized: "${text}"`);
       const ascii = await render(text);
       res.json({ success: true, text, ascii });
     } catch (err) {
@@ -127,8 +133,18 @@ app.post('/capture/drawing', (req, res) => {
   });
 });
 
+// Global uncaught exception handlers
+process.on('uncaughtException', (err) => {
+  logger.error(`Uncaught exception: ${err.message}\n${err.stack}`);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason) => {
+  logger.error(`Unhandled rejection: ${reason instanceof Error ? reason.stack : reason}`);
+});
+
 app.listen(PORT, '0.0.0.0', () => {
   logger.info(`Server started on port ${PORT}`);
   logger.info(`Video device: ${VIDEO_DEVICE}`);
-  logger.info(`Open in browser: http://<raspberry-pi-ip>:${PORT}`);
+  logger.result(`Ready — open http://<raspberry-pi-ip>:${PORT}`);
 });
