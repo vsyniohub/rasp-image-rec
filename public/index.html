@@ -14,9 +14,10 @@
       display: flex;
       flex-direction: column;
       align-items: center;
+      justify-content: center;
       min-height: 100vh;
-      padding: 24px 16px;
-      gap: 24px;
+      gap: 32px;
+      padding: 24px;
     }
 
     h1 {
@@ -26,193 +27,56 @@
       text-transform: uppercase;
     }
 
-    #live-view {
-      width: 100%;
-      max-width: 800px;
+    .mode-grid {
+      display: flex;
+      gap: 16px;
+    }
+
+    .mode-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      width: 180px;
+      height: 180px;
+      background: #1a1a1a;
       border: 1px solid #333;
-      border-radius: 4px;
-      background: #111;
-    }
-
-    #live-view img {
-      width: 100%;
-      display: block;
-      border-radius: 4px;
-    }
-
-    .btn {
-      padding: 14px 48px;
-      font-size: 1rem;
+      border-radius: 6px;
+      color: #e0e0e0;
       font-family: inherit;
+      font-size: 0.85rem;
       letter-spacing: 0.1em;
       text-transform: uppercase;
-      background: #1a1a1a;
-      color: #e0e0e0;
-      border: 1px solid #555;
-      border-radius: 4px;
+      text-decoration: none;
       cursor: pointer;
       transition: background 0.15s, border-color 0.15s;
     }
 
-    .btn:hover:not(:disabled) {
+    .mode-btn:hover {
       background: #2a2a2a;
-      border-color: #888;
+      border-color: #666;
     }
 
-    .btn:disabled {
-      opacity: 0.4;
-      cursor: not-allowed;
-    }
-
-    #btn-row {
-      display: flex;
-      gap: 12px;
-    }
-
-    #test-btn {
-      padding: 14px 24px;
-      font-size: 0.8rem;
-      border-color: #3a3a3a;
-      color: #888;
-    }
-
-    #preview-img {
-      display: none;
-      width: 100%;
-      max-width: 800px;
-      border: 1px solid #333;
-      border-radius: 4px;
-      margin-top: -8px;
-    }
-
-    #status {
-      font-size: 0.85rem;
-      color: #666;
-      min-height: 1.2em;
-      letter-spacing: 0.05em;
-    }
-
-    #result {
-      width: 100%;
-      max-width: 900px;
-      display: none;
-    }
-
-    #result-label {
-      font-size: 0.75rem;
-      color: #555;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      margin-bottom: 8px;
-    }
-
-    #ascii-art {
-      background: #111;
-      border: 1px solid #333;
-      border-radius: 4px;
-      padding: 24px;
-      font-size: clamp(0.5rem, 1.5vw, 1rem);
-      line-height: 1.2;
-      white-space: pre;
-      color: #c8ff80;
-      overflow-x: auto;
-    }
-
-    #recognized-char {
-      margin-top: 12px;
-      font-size: 0.85rem;
-      color: #888;
-    }
-
-    #error-msg {
-      color: #ff6b6b;
-      font-size: 0.85rem;
+    .mode-btn span.icon {
+      font-size: 2.5rem;
     }
   </style>
 </head>
 <body>
 
-  <h1>Handwritten Letter Recognition</h1>
+  <h1>Letter Recognition</h1>
 
-  <div id="live-view">
-    <img id="stream-img" src="/stream" alt="Live view" />
+  <div class="mode-grid">
+    <a class="mode-btn" href="/camera">
+      <span class="icon">📷</span>
+      Camera
+    </a>
+    <a class="mode-btn" href="/draw">
+      <span class="icon">✏️</span>
+      Draw
+    </a>
   </div>
-
-  <div id="btn-row">
-    <button id="capture-btn" class="btn">Capture</button>
-    <button id="test-btn" class="btn">Test shot</button>
-  </div>
-
-  <img id="preview-img" alt="Preprocessed capture preview" />
-
-  <p id="status"></p>
-  <p id="error-msg"></p>
-
-  <div id="result">
-    <p id="result-label">Recognized output</p>
-    <pre id="ascii-art"></pre>
-    <p id="recognized-char"></p>
-  </div>
-
-  <script>
-    const testBtn = document.getElementById('test-btn');
-    const previewImg = document.getElementById('preview-img');
-
-    testBtn.addEventListener('click', async () => {
-      testBtn.disabled = true;
-      status.textContent = 'Capturing test shot...';
-      errorMsg.textContent = '';
-      previewImg.style.display = 'none';
-
-      try {
-        const res = await fetch('/capture/raw', { method: 'POST' });
-        if (!res.ok) throw new Error(await res.text());
-        const blob = await res.blob();
-        previewImg.src = URL.createObjectURL(blob);
-        previewImg.style.display = 'block';
-        status.textContent = 'Test shot done — check preprocessing quality.';
-      } catch (e) {
-        errorMsg.textContent = 'Test shot error: ' + e.message;
-        status.textContent = '';
-      } finally {
-        testBtn.disabled = false;
-      }
-    });
-
-    const btn = document.getElementById('capture-btn');
-    const status = document.getElementById('status');
-    const errorMsg = document.getElementById('error-msg');
-    const result = document.getElementById('result');
-    const asciiArt = document.getElementById('ascii-art');
-    const recognizedChar = document.getElementById('recognized-char');
-
-    btn.addEventListener('click', async () => {
-      btn.disabled = true;
-      status.textContent = 'Capturing...';
-      errorMsg.textContent = '';
-      result.style.display = 'none';
-
-      try {
-        const res = await fetch('/capture', { method: 'POST' });
-        const data = await res.json();
-
-        if (data.success) {
-          asciiArt.textContent = data.ascii;
-          recognizedChar.textContent = `Detected: "${data.text}"`;
-          result.style.display = 'block';
-          status.textContent = 'Done.';
-        } else {
-          errorMsg.textContent = data.error || 'Recognition failed.';
-          status.textContent = '';
-        }
-      } catch (e) {
-        errorMsg.textContent = 'Server error: ' + e.message;
-        status.textContent = '';
-      } finally {
-        btn.disabled = false;
-      }
-    });
-  </script>
 
 </body>
 </html>

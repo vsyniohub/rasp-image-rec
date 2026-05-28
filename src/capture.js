@@ -33,4 +33,4 @@ async function preprocess() {
   return PROCESSED_PATH;
 }
 
-module.exports = { grabFrame, preprocess, CAPTURE_PATH, PROCESSED_PATH };
+module.exports = { grabFrame, preprocess, CAPTURE_PATH, PROCESSED_PATH, TMP_DIR };
